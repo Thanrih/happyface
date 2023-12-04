@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 
 print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
-# Define constants
+
 image_width, image_height = 160, 160
 image_color_channel = 3
 batch_size = 32
@@ -12,12 +12,12 @@ learning_rate = 0.0003
 class_names = ['happy', 'sad']
 model_path = 'path/to/model'
 
-# Define dataset directories
+# Os diretórios
 dataset_dir = os.path.join(os.getcwd(), 'DataSet')
 dataset_treino_dir = os.path.join(dataset_dir, 'treino')
 dataset_validacao_dir = os.path.join(dataset_dir, 'validacao')
 
-# Function to load and preprocess dataset
+# Carregar o dataset
 def load_dataset(directory):
     return tf.keras.preprocessing.image_dataset_from_directory(
         directory,
@@ -26,11 +26,11 @@ def load_dataset(directory):
         shuffle=True
     )
 
-# Load training and validation datasets
+# puxando os diretórios de treino e validação
 dataset_treino = load_dataset(dataset_treino_dir)
 dataset_validacao = load_dataset(dataset_validacao_dir)
 
-# Function to plot datasets
+# função pra mostrar os datasets que eu quiser
 def plot_datasets(dataset):
     plt.figure(figsize=(15, 15))
     for features, labels in dataset.take(1):
@@ -41,26 +41,26 @@ def plot_datasets(dataset):
             plt.title(class_names[labels[i]])
     plt.show()
 
-# Plot datasets (if needed)
+# Plot datasets()
 # plot_datasets(dataset_treino)
 # plot_datasets(dataset_validacao)
 
-# Data Augmentation
+# estou aprimorando a análise das imagens dando zoom e as rotacionando
 data_augmentation = tf.keras.models.Sequential([
     tf.keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
     tf.keras.layers.experimental.preprocessing.RandomRotation(0.2),
     tf.keras.layers.experimental.preprocessing.RandomZoom(0.2)
 ])
 
-# Load or create the model
+# agora realmente começa o código, e estou verificando se ele já tem algum save, se não, vai pro treinamento
 if os.path.exists(model_path):
     model = tf.keras.models.load_model(model_path)
     print("Modelo carregado com sucesso!")
     model.summary()
 else:
-    print("O modelo ainda não foi treinado. Execute o treinamento primeiro.")
+    print("O modelo ainda não foi treinado.")
 
-    # Base Model (MobileNetV2)
+    # Estou usando um método de transferencia de aprendizado, usando dados de uma rede neural já treinada com milhares de outras imagens
     base_model = tf.keras.applications.EfficientNetB0(
     input_shape=(image_width, image_height, image_color_channel),
     include_top=False,
@@ -68,7 +68,7 @@ else:
     )
     base_model.trainable = False
 
-    # Build the model
+    # estou processando as imagens, convertendo elas para um formato entendível e processável
     model = tf.keras.models.Sequential([
         tf.keras.layers.experimental.preprocessing.Rescaling(1.0 / (image_color_channel / 2), offset=-1, input_shape=(image_width, image_height, image_color_channel)),
         data_augmentation,
@@ -77,21 +77,21 @@ else:
         tf.keras.layers.Dropout(0.1),
         tf.keras.layers.Dense(1, activation='sigmoid')
     ])
-
+    #otimizando a bomba de dados que é a model
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         loss='binary_crossentropy',
         metrics=['accuracy']
     )
 
-    # Training
+    # histórico pra treinamento
     history = model.fit(
         dataset_treino,
         validation_data=dataset_validacao,
         epochs=epochs
     )
 
-    # Plot training history
+    # exibição de histórico
     def plot_model():
         plt.figure(figsize=(15, 8))
 
@@ -111,7 +111,7 @@ else:
     plot_model()
     model.save(model_path)
 
-# Function to plot dataset predictions on test set
+# Função pra mostrar o dataset no final de tudo
 def plot_dataset_predictions_test(dataset):
     features, labels = dataset.as_numpy_iterator().next()
     predictions = model.predict_on_batch(features).flatten()
@@ -128,5 +128,5 @@ def plot_dataset_predictions_test(dataset):
         plt.title(class_names[predictions[i]])
     plt.show()
 
-# Test the model on a validation dataset
-plot_dataset_predictions_test(dataset_validacao.take(tf.data.experimental.cardinality(dataset_validacao) // 5))
+# mostrar o resultado final
+plot_dataset_predictions_test(dataset_validacao.take(tf.data.experimental.cardinality(dataset_validacao) // 9))
