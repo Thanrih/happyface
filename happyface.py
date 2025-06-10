@@ -1,23 +1,26 @@
 import os
+import pickle
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
-
+# Verificando disponibilidade da GPU
+print("Dispositivos físicos:", tf.config.list_physical_devices())
+print("GPUs disponíveis:", tf.config.list_physical_devices('GPU'))
+# Configurações
 image_width, image_height = 160, 160
 image_color_channel = 3
 batch_size = 32
 epochs = 20
 learning_rate = 0.0003
 class_names = ['happy', 'sad']
-model_path = 'path/to/model'
+model_path = os.path.join(os.getcwd(), 'modelo_salvo')
 
-# Os diretórios
-dataset_dir = os.path.join(os.getcwd(), 'DataSet')
+# Diretórios do dataset
+dataset_dir = os.path.join(os.getcwd(), 'DataSet', 'DataSet')
 dataset_treino_dir = os.path.join(dataset_dir, 'treino')
 dataset_validacao_dir = os.path.join(dataset_dir, 'validacao')
 
-# Carregar o dataset
+# Carregamento dos datasets
 def load_dataset(directory):
     return tf.keras.preprocessing.image_dataset_from_directory(
         directory,
@@ -26,11 +29,10 @@ def load_dataset(directory):
         shuffle=True
     )
 
-# puxando os diretórios de treino e validação
 dataset_treino = load_dataset(dataset_treino_dir)
 dataset_validacao = load_dataset(dataset_validacao_dir)
 
-# função pra mostrar os datasets que eu quiser
+# Visualização de amostras do dataset
 def plot_datasets(dataset):
     plt.figure(figsize=(15, 15))
     for features, labels in dataset.take(1):
@@ -41,18 +43,14 @@ def plot_datasets(dataset):
             plt.title(class_names[labels[i]])
     plt.show()
 
-# Plot datasets()
-# plot_datasets(dataset_treino)
-# plot_datasets(dataset_validacao)
-
-# estou aprimorando a análise das imagens dando zoom e as rotacionando
-data_augmentation = tf.keras.models.Sequential([
-    tf.keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
-    tf.keras.layers.experimental.preprocessing.RandomRotation(0.2),
-    tf.keras.layers.experimental.preprocessing.RandomZoom(0.2)
+# Aumento de dados
+data_augmentation = tf.keras.Sequential([
+    tf.keras.layers.RandomFlip('horizontal'),
+    tf.keras.layers.RandomRotation(0.2),
+    tf.keras.layers.RandomZoom(0.2)
 ])
 
-# agora realmente começa o código, e estou verificando se ele já tem algum save, se não, vai pro treinamento
+# Treinamento ou carregamento do modelo
 if os.path.exists(model_path):
     model = tf.keras.models.load_model(model_path)
     print("Modelo carregado com sucesso!")
@@ -60,38 +58,37 @@ if os.path.exists(model_path):
 else:
     print("O modelo ainda não foi treinado.")
 
-    # Estou usando um método de transferencia de aprendizado, usando dados de uma rede neural já treinada com milhares de outras imagens
     base_model = tf.keras.applications.EfficientNetB0(
-    input_shape=(image_width, image_height, image_color_channel),
-    include_top=False,
-    weights='imagenet'
+        input_shape=(image_width, image_height, image_color_channel),
+        include_top=False,
+        weights='imagenet'
     )
     base_model.trainable = False
 
-    # estou processando as imagens, convertendo elas para um formato entendível e processável
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.experimental.preprocessing.Rescaling(1.0 / (image_color_channel / 2), offset=-1, input_shape=(image_width, image_height, image_color_channel)),
+    model = tf.keras.Sequential([
+        tf.keras.layers.Rescaling(1./255, input_shape=(image_width, image_height, image_color_channel)),
         data_augmentation,
         base_model,
         tf.keras.layers.GlobalAveragePooling2D(),
         tf.keras.layers.Dropout(0.1),
         tf.keras.layers.Dense(1, activation='sigmoid')
     ])
-    #otimizando a bomba de dados que é a model
+
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         loss='binary_crossentropy',
         metrics=['accuracy']
     )
 
-    # histórico pra treinamento
     history = model.fit(
         dataset_treino,
         validation_data=dataset_validacao,
         epochs=epochs
     )
 
-    # exibição de histórico
+    with open('train_history.pkl', 'wb') as f:
+        pickle.dump(history.history, f)
+
     def plot_model():
         plt.figure(figsize=(15, 8))
 
@@ -102,16 +99,16 @@ else:
         plt.legend(loc='lower right')
 
         plt.subplot(1, 2, 2)
-        plt.title('Valor de perda no treino e validação')
-        plt.plot(history.history['loss'], label='Training loss')
-        plt.plot(history.history['val_loss'], label='Val loss')
+        plt.title('Perda no treino e validação')
+        plt.plot(history.history['loss'], label='perda treino')
+        plt.plot(history.history['val_loss'], label='perda validação')
         plt.legend(loc='lower right')
         plt.show()
 
     plot_model()
     model.save(model_path)
 
-# Função pra mostrar o dataset no final de tudo
+# Predições em lote final
 def plot_dataset_predictions_test(dataset):
     features, labels = dataset.as_numpy_iterator().next()
     predictions = model.predict_on_batch(features).flatten()
@@ -128,5 +125,5 @@ def plot_dataset_predictions_test(dataset):
         plt.title(class_names[predictions[i]])
     plt.show()
 
-# mostrar o resultado final
 plot_dataset_predictions_test(dataset_validacao.take(tf.data.experimental.cardinality(dataset_validacao) // 9))
+1
